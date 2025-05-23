@@ -1,4 +1,4 @@
-# brain-llm-convergence
+# Language Models and the Brain: Areas of Convergence
 An analysis of the architectural and functional similarity between a language model and the brain. 
 
 
