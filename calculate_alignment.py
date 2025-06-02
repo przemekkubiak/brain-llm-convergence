@@ -466,4 +466,3 @@ for i in range(len(all_rois)):
 plt.title("ROI-Layer Cosine Similarity (Syntactic Features)")
 plt.tight_layout()
 plt.show()
-# ...existing code.
