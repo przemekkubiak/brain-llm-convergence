@@ -8,8 +8,9 @@ from collections import defaultdict
 roi_significant_features = {}
 roi_r2 = defaultdict(dict)
 
-for filename in ["results/ridge_frem_scores_backwards.csv",
-                 "results/ridge_frem_scores_forward.csv"]:
+roi_dummy_scores = defaultdict(list)
+
+for filename in ["results/ridge_frem_scores_backwards.csv", "results/ridge_frem_scores_forward.csv"]:
     with open(filename, "r", newline="") as csvfile:
         reader = csv.DictReader(csvfile)
         for row in reader:
@@ -19,11 +20,23 @@ for filename in ["results/ridge_frem_scores_backwards.csv",
             dummy_score = float(row["Dummy_FREM_score"])
             if frem_score > dummy_score:
                 roi_significant_features.setdefault(roi, set()).add(feature)
-                roi_r2[roi][feature] = float(row["FREM_score"])
+                roi_r2[roi][feature] = frem_score
+                # Collect dummy scores for these significant features
+                roi_dummy_scores[roi].append(dummy_score)
+
+# Compute the average dummy score for each ROI
+roi_avg_dummy_score = {}
+for roi, scores in roi_dummy_scores.items():
+    if len(scores) > 0:
+        roi_avg_dummy_score[roi] = sum(scores) / len(scores)
+    else:
+        roi_avg_dummy_score[roi] = 0.0
 
 # 2) Collect significant features per layer based on p_value <= 0.2
 layer_significant_features = {}
 layer_r2 = defaultdict(dict)
+
+baseline_scores = []
 
 with open("results/probing_results.csv", "r", newline="") as csvfile:
     reader = csv.DictReader(csvfile)
@@ -31,6 +44,8 @@ with open("results/probing_results.csv", "r", newline="") as csvfile:
         layer = row["layer"]
         feature = row["feature"]
         p_value = float(row["p_value"])
+        baseline = flot(row["baseline_score"])
+        baseline_scores.append(baseline)
         if p_value <= 0.2:
             layer_significant_features.setdefault(layer, set()).add(feature)
             layer_r2[layer][feature] = float(row["actual_mean_r2"])
@@ -320,38 +335,81 @@ for roi in all_rois:
           f"Syntactic R²: {roi_syntactic_r2[roi]:.4f}")
     
 
+## PLOTTING
+
 # 1) Plot layer-level averages in a grouped bar chart
 layer_labels = layers
 layer_discourse_vals = [layer_discourse_r2[l] for l in layer_labels]
 layer_syntactic_vals = [layer_syntactic_r2[l] for l in layer_labels]
 
+baseline_value = np.median(baseline_scores)
+layer_baseline_vals = [baseline_value for l in layer_labels]
+
 x = np.arange(len(layer_labels))
 width = 0.35
 
 plt.figure(figsize=(10, 5))
+
+# Plot bars for discourse and syntactic
 plt.bar(x - width/2, layer_discourse_vals, width, label='Discourse Avg R²')
 plt.bar(x + width/2, layer_syntactic_vals, width, label='Syntactic Avg R²')
+
+# Plot horizontal lines for baseline
+for i, baseline_val in enumerate(layer_baseline_vals):
+    label = 'Baseline Avg R²' if i == 0 else None
+    plt.hlines(
+        y=baseline_val,
+        xmin=x[i] - width/2,
+        xmax=x[i] + width/2,
+        colors='red',
+        linestyles='-',
+        linewidth=2,
+        label=label
+    )
+
 plt.xticks(x, layer_labels, rotation=45, ha='right')
 plt.ylabel('Average R²')
-plt.title('Layer-Level Average R² (Discourse vs. Syntactic)')
+plt.title('Layer-Level Average R² (Discourse vs. Syntactic vs. Baseline)')
 plt.legend()
 plt.tight_layout()
 #plt.show()
 
 # 2) Plot ROI-level averages in a grouped bar chart
 roi_labels = all_rois
+
 roi_discourse_vals = [roi_discourse_r2[r] for r in roi_labels]
 roi_syntactic_vals = [roi_syntactic_r2[r] for r in roi_labels]
 
+roi_baseline_vals = [roi_avg_dummy_score[r] for r in roi_labels]
+
+print(roi_baseline_vals)
+
 x = np.arange(len(roi_labels))
-width = 0.35
+width = 0.25
 
 plt.figure(figsize=(10, 5))
+
+# Plot bars for discourse and syntactic
 plt.bar(x - width/2, roi_discourse_vals, width, label='Discourse Avg R²')
 plt.bar(x + width/2, roi_syntactic_vals, width, label='Syntactic Avg R²')
+
+# Plot horizontal lines for baselines
+for i, baseline_val in enumerate(roi_baseline_vals):
+    label = 'Baseline Avg R²' if i == 0 else None
+    plt.hlines(
+        y=baseline_val,
+        xmin=x[i] - width/2,
+        xmax=x[i] + width/2,
+        colors='red',           # More visible color
+        linestyles='-',         # Could use '--' or '-.'
+        linewidth=2.0,          # Increase line thickness
+        label=label
+    )
+
+plt.ylim(bottom=-0.0003)
 plt.xticks(x, roi_display_names, rotation=45, ha='right')
 plt.ylabel('Average R²')
-plt.title('ROI-Level Average R² (Discourse vs. Syntactic)')
+plt.title('ROI-Level Average R² (Discourse vs. Syntactic vs. Baseline)')
 plt.legend()
 plt.tight_layout()
 #plt.show()
