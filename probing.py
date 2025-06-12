@@ -108,6 +108,24 @@ for layer in layers:
         dataset = TensorDataset(X_layer, y_feature)
         train_loader = DataLoader(dataset, batch_size=128, shuffle=True)
         val_loader = DataLoader(dataset, batch_size=128, shuffle=False)
+
+        baseline_scores = []
+        for train_idx, val_idx in cv.split(X_layer):
+            X_train, X_val = X_layer[train_idx], X_layer[val_idx]
+            y_train, y_val = y_feature[train_idx], y_feature[val_idx]
+
+            # ----- MEAN BASELINE -----
+            # 1) Compute the mean of y_train
+            y_train_mean = y_train.mean()
+
+            # 2) Create baseline predictions for y_val using that mean
+            y_val_pred = torch.full_like(y_val, y_train_mean.item())
+
+            # 3) Compute MSE loss for baseline
+            baseline_loss = nn.MSELoss()(y_val_pred, y_val)
+            baseline_scores.append(baseline_loss.item())
+
+        mean_baseline_score = np.mean(baseline_scores)
         
         # Calculate actual score
         actual_scores = []
@@ -163,6 +181,7 @@ for layer in layers:
             "layer": layer,
             "feature": feature,
             "actual_mean_r2": actual_mean_score,
+            "baseline_score": mean_baseline_score,
             "p_value": p_value
         })
 
